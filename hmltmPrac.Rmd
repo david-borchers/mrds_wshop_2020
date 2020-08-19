@@ -18,16 +18,6 @@ knitr::opts_chunk$set(echo = TRUE)
 answer <- FALSE
 ```
 
-# Objectives 
-
-The aim of this exercise is to illustrate the process of drawing inference using hidden Markov line transect models (HMLTMs):
-
-1. Understand the data required for inference,
-2. Explore a number of detection models,
-3. Illustrate model selection,
-4. Illustrate how confidence intervals are obtained,
-5. Compare with conventional line transect methods using ``correction factors''.
-
 # The Data
 
 The data used in this exercise were gathered on a shipboard survey of beaked whales in the Alboran sea in 2008, from a vessel moving at about 3.5 m/s. Beaked whales have long dives and spend a lot of time underwater and unobservable. Focal follows of whales gave estimates of mean times available (at surface) and unavailable (diving) in a single dive cycle of 122 seconds and 1,580 seconds, respecively, with standard errors of these means of 9.62 seconds and 134.9 seconds, respectively.
@@ -79,12 +69,12 @@ The hazard-rate model is clearly preferable, so lets check that it seems adequat
 ```{r, echo=TRUE, eval=TRUE, fig.height=3.5, fig.width=7}
 cutpoints = seq(0,max(na.omit(bkdsdat$distance)),length=21)
 par(mfrow=c(1,2))
-plot(bk.hr, breaks=cutpoints, main="Half normal model, beaked shipboard survey")
+plot(bk.hr, breaks=cutpoints, main="Hazard-rate model, beaked shipboard survey")
 gof_ds(bk.hr)
 ```
 \normalsize
 
-That looks OK, so we will proceed using this model. We know that $g(0)$ is less than 1 (because of how long the whales dive), so the CDS estiamtes will be negatively biased, but lets look at the total abundance estimate anyway:
+That looks OK, so we will proceed using this model. We know that $g(0)$ is less than 1 (because of how long the whales dive), so the CDS estimates will be negatively biased, but lets look at the total abundance estimate anyway:
 
 \small
 ```{r, echo=TRUE, eval=TRUE}
@@ -155,7 +145,9 @@ Lets use these to ``correct'' the CDS abundance estimates:
 simple.N = cds.N/cf[,"simple"]
 mclaren.N = cds.N/cf[,"mclaren"]
 laake.N = cds.N/cf[,"laake"]
-Nests = t(data.frame(simple=round(simple.N),mclaren=round(mclaren.N),laake=round(laake.N)))
+Nests = t(data.frame(simple=round(simple.N),
+                     mclaren=round(mclaren.N),
+                     laake=round(laake.N)))
 knitr::kable(Nests, caption="Corrected abundance estimates")
 ```
 
@@ -165,7 +157,7 @@ Lets take another look at the forward distance data and think about what this im
 
 \normalsize
 \small
-```{r, echo=TRUE, eval=TRUE, fig.height=4, fig.width=6}
+```{r, echo=TRUE, eval=TRUE, fig.height=3.5, fig.width=6}
 hist(beaked.ship$y,breaks=xcuts,xlab="Forward Distance",main="")
 ```
 \normalsize
@@ -181,15 +173,116 @@ McLaren's method estimates the probability that a whale is available \texttt{at 
 ## Laake's correction factor
 Laake's method estimates the probability that a whale is available \texttt{at least once} while within detectable distance, and does so in a sensible way, but is this the appropriate correction factor?
 
-Look at the forward distance plot and consider the fact that \textit{where} the animal becomes available between forward distance 0 and `r ymax` m. If it becomes available anywhere farther ahead than about 1,500 m, there is only a very small chance that it will be detected (we know this because very few detections occurred beyond about 1,500 m). So you would expect that an appropriate correction factor should be smaller than the probability that a whale is available \texttt{at least once}, and hence that Laake's correction factor is too big, and the associated abundance estiamte too small.
+Look at the forward distance plot and consider the fact that \textit{where} the animal becomes available between forward distance 0 and `r ymax` m. If it becomes available anywhere farther ahead than about 1,500 m, there is only a very small chance that it will be detected (we know this because very few detections occurred beyond about 1,500 m). So you would expect that an appropriate correction factor should be smaller than the probability that a whale is available \texttt{at least once}, and hence that Laake's correction factor is too big, and the associated abundance estimate too small.
 
 # The Hidden Markov Line Transect Abundance Estimator
 
+## The \texttt{hmltm} package
+
+We will use the \texttt{hmltm} package to fit a hidden Markov line transect model to these survey data. The package is available on GitHub here [https://github.com/david-borchers/hmltm](https://github.com/david-borchers/hmltm). It was \textbf{not} written as a user-friendly general package, and has very little in the way of error traps and data checks. It has been used for a number of real analyses and so while I am pretty sure it is error free (or as error-free as a package with its level of use would typically be), I do not vouch for its ease of use, and nor do I guarantee that if you try it with new data that nothing will go wrong -- something probably will go wrong!
+
+
+## Setting things up
+
+To use the hidden Markov line transect (HMLT) method, we need first to spefify some key survey parameters:
+
 \small
 ```{r, echo=TRUE, eval=TRUE}
+# set survey and fitting parameters
+spd=3.5 # observer speed
+Wl=0 # left-truncation for perpendicular distance (none here)
+W=4000 # right-truncatino for perpendicular distance
+W.est=W # set perpendicular truncation distance for Horvitz-Thompson-like 
+#         abundance estimator
+ymax=4500 # maximum forward distance beyond which nothing could be detected
+
+# specify survey parameters and put them in an object called `survey.pars`,
+# using the hmltm funciton `make.survey.parsz
+survey.pars=make.survey.pars(spd=3.5,Wl=0,W=4000,ymax=4500) 
+
+# set some fitting parameters
+# hessian=FALSDE says don't estimate Hessian matrix, and 
+# nx=64 says use 64 cutpoints when integrating over the perp distance dimension
+control.fit=list(hessian=FALSE,nx=64)
+
+# set some parameters for the optimiser
+# trace specifies how much to report as function is optimised
+# maxit is maximum number of iterations when optimising
+# see help(optim) for more
+control.opt=list(trace=0,maxit=1000)
 ```
+
+
+## Fitting a model
+
+Now we fit the model with the function \texttt{est.hmltm}. You can choose from a number of detection hazard model forms (see the vignette that comes with the \texttt{hmltm} package) and depending on which model you use, you can specirfy dependence of the parameters in the $x$- and/or $y$-dimension on covariates. All the detection hazard forms assume that detection of an available animal that is at \textit{radial} distance zero (not perpendicular distance zero) are detected. Here we don't use any covariates. You also have to specify paramerter starting values, which is a bit of a pain, but the vignette that comes with the \texttt{hmltm} package) give a little guidance on this.
+
 \normalsize
 \small
-```{r, echo=TRUE, eval=TRUE}
+```{r, echo=TRUE, eval=TRUE, warning=FALSE, message=FALSE}
+# specify model and starting parameter values and fit model
+hfun="h.EP2x.0" # detection hazard model to use
+models=list(y=NULL,x=NULL) # specify detection hazard model form (no covariates)
+
+# You need to give starting values to the optimiser:
+pars=c(0.45, 0.31, 7.7, 62.8) # detection hazard parameter starting values
+
+# Point estimation:
+bkEP2x.null=est.hmltm(beaked.ship,pars,hfun,models,survey.pars,availpars,
+                      control.fit,control.opt,W.est=W.est)
 ```
 \normalsize
+
+## Checking goodness-of-fit
+
+We can look at diagnostic plots similarly to the way we do for CDS models, but now we need to consider the goodness-of-fit in both the $x$- and the $y$-dimensions
+\small
+```{r, echo=TRUE, eval=TRUE, cache=TRUE, fig.height=6, fig.width=6, message=FALSE, warning=FALSE}
+# Look at goodness of fit
+par(mfrow=c(2,2))
+bkEP2x.null.fx=fxfit.plot(bkEP2x.null,breaks=xcuts,type="prob",allx=FALSE)
+bkEP2x.null.fy=fyfit.plot(bkEP2x.null,breaks=ycuts,allx=FALSE,nys=250)
+bkEP2x.null.gof.x=hmmlt.gof.x(bkEP2x.null)
+bkEP2x.null.gof.y=hmmlt.gof.y(bkEP2x.null,breaks=ycuts)
+```
+\normalsize
+
+These plots and the associated Kolmogorov-Smirnov test statistics for the fits in the $x$- and the $y$-dimensions suggest that the model fits pretty well:
+
+```{r, echo=TRUE, eval=TRUE, cache=TRUE}
+gof_hmltm = data.frame(perp_dist=bkEP2x.null.gof.x$p.ks, 
+                       forward_dist=bkEP2x.null.gof.y$p.ks)
+knitr::kable(round(gof_hmltm,3),
+             caption="Kolmogorov-Smirnov test statistics")
+```
+
+## Obtaining confidence intervals by bootstrap
+
+Confidence intervals can be obtained by bootstrapping. For comparison with the correction factor methods used above, we treat the avaiability model as fixed and known here (\texttt{fixed.avail=TRUE}), but we need not do so in general. Similarly to other \texttt{hmltm} functions, you can get help on the use of the boostrap function \texttt{bs.hmltm} by typing \texttt{help(bs.hmltm)}.
+
+\small
+```{r, echo=TRUE, eval=FALSE, cache=TRUE}
+set.seed(1)
+bests = bs.hmltm(bkEP2x.null,B=50,hmm.pars.bs=availpars,bs.trace=0,report.by=10,
+                 fixed.avail=TRUE,bsfile="./objects/beaked.bsests.RData")
+```
+
+The functions \texttt{bootsum} and \texttt{strat.estable} help you summarise the estimates from bootstraps in a convenient way:
+
+```{r, echo=TRUE, eval=TRUE, warning=FALSE, message=FALSE}
+load("./objects/beaked.bsests.RData") # get bootstrap estimates file
+bsum = bootsum(bests)
+estable = strat.estable(bkEP2x.null$point$ests,bsum$cv)
+hmltmNests = estable[3,c("N","N.lo","N.hi")]
+names(hmltmNests) = colnames(Nests)
+Nests = rbind(Nests,hmltm=hmltmNests)
+knitr::kable(round(Nests),caption="Abundance estimates")
+```
+\normalsize
+
+## Conclusion
+
+The HMLT method abundance estimate falls between that from the simple (instantaneous) correction method and that from Laake's correction method -- as expected. Moreover, in scenarios in which the survey is not instantaneous (when the simple method is valid) and in which available animals are not certain to be detected when within detectable range (when Laake's method is valid), the correction factor methods are not appropriate.
+
+In such cases the HMLT method provides a valid and rigorous method for estimating density and abundance. It uses more information than any of the correction factor methods (namely the forward distances), and it uses this with an assumption that available animals that are at \textit{radial} distance zero are detected with certainty - a much weaker assumption than that of CDS line transect methods. It comes with the usual maximum likelihood-based model selection and diagnostic tools. It does require forward distance data.
+

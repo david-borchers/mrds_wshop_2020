@@ -111,6 +111,9 @@ bkEP2x.null.gof.y=hmmlt.gof.y(bkEP2x.null,breaks=ycuts);bkEP2x.null.gof.y$p.ks
 # Bootstrap (treating availability parameter as fixed)
 set.seed(1)
 system.time(bests<-bs.hmltm(bkEP2x.null,B=50,hmm.pars.bs=availpars,bs.trace=0,report.by=10,fixed.avail=TRUE,bsfile=NULL))
+
+save(bests,file="./objects/beaked.bsests.RData")
+
 bsum = bootsum(bests)
 estable = strat.estable(bkEP2x.null$point$ests,bsum$cv)
 hmltmNests = estable[3,c("N","N.lo","N.hi")]
