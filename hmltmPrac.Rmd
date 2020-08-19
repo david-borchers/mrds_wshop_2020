@@ -184,7 +184,7 @@ We will use the \texttt{hmltm} package to fit a hidden Markov line transect mode
 
 ## Setting things up
 
-To use the hidden Markov line transect (HMLT) method, we need first to spefify some key survey parameters:
+To use the hidden Markov line transect (HMLT) method, we need first to specify some key survey parameters:
 
 \small
 ```{r, echo=TRUE, eval=TRUE}
@@ -215,7 +215,7 @@ control.opt=list(trace=0,maxit=1000)
 
 ## Fitting a model
 
-Now we fit the model with the function \texttt{est.hmltm}. You can choose from a number of detection hazard model forms (see the vignette that comes with the \texttt{hmltm} package) and depending on which model you use, you can specirfy dependence of the parameters in the $x$- and/or $y$-dimension on covariates. All the detection hazard forms assume that detection of an available animal that is at \textit{radial} distance zero (not perpendicular distance zero) are detected. Here we don't use any covariates. You also have to specify paramerter starting values, which is a bit of a pain, but the vignette that comes with the \texttt{hmltm} package) give a little guidance on this.
+Now we fit the model with the function \texttt{est.hmltm}. You can choose from a number of detection hazard model forms (see the vignette that comes with the \texttt{hmltm} package) and depending on which model you use, you can specirfy dependence of the parameters in the $x$- and/or $y$-dimension on covariates. All the detection hazard forms assume that detection of an available animal that is at \textit{radial} distance zero (not perpendicular distance zero) are detected. Here we don't use any covariates. You also have to specify paramerter starting values, which is a bit of a pain, but the vignette that comes with the \texttt{hmltm} package give a little guidance on this.
 
 \normalsize
 \small
