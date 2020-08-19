@@ -22,6 +22,10 @@ cutpoints = seq(0,max(na.omit(bkdsdat$distance)),length=21)
 plot(bk.hr, breaks=cutpoints, main="Half normal model, beaked shipboardl survey")
 gof_ds(bk.hr)
 
+cds.N = c(est=bk.hr$dht$individuals$N$Estimate[3],
+             lcl=bk.hr$dht$individuals$N$lcl[3],
+             ucl=bk.hr$dht$individuals$N$ucl[3])
+cds.N
 
 # Correction factors:
 xcuts = seq(0,max(na.omit(beaked.ship$x)),length=21)
@@ -34,9 +38,10 @@ hist(beaked.ship$y,breaks=xcuts,xlab="Forward Distance",main="")
 
 ymax = 4500
 
-Eu=1580
-Ea=122
+Eu=1580 # mean time UNavailable -per dive cycle
+Ea=122 # mean time available per dive cycle
 spd = 3.5 # ship speed in m/s
+# Calculate time in view, in minutes
 tiv = ymax/spd / 60 # minutes in view
 tiv
 Ea/60 # meand nuber minutes up (available)
@@ -53,24 +58,20 @@ simple.cf = simple.a(availpars)
 laake.cf = laake.a(availpars,spd=spd, ymax=ymax)
 mclaren.cf = mclaren.a(availpars,spd=spd, ymax=ymax)
 # put them in a list for convenience
-cf = list(simple=simple.cf$mean, mclaren=mclaren.cf$mean, laake=laake.cf$mean) 
+cf = data.frame(simple=simple.cf$mean, 
+                mclaren=mclaren.cf$mean, 
+                laake=laake.cf$mean) 
 cf
 
 # "Corrected" total abundance estimates
-bk.hr$dht$individuals$N$Estimate[3]/cf$laake
-bk.hr$dht$individuals$N$Estimate[3]/cf$simple
-bk.hr$dht$individuals$N$Estimate[3]/cf$mclaren
+bk.hr$dht$individuals$N$Estimate[3]/cf[,"simple"]
+bk.hr$dht$individuals$N$Estimate[3]/cf[,"mclaren"]
+bk.hr$dht$individuals$N$Estimate[3]/cf[,"laake"]
 
 # Point estimates of total abundance and 95% CI with each correction method
-simple.N = c(est=bk.hr$dht$individuals$N$Estimate[3]/cf$simple,
-          lcl=bk.hr$dht$individuals$N$lcl[3]/cf$simple,
-          ucl=bk.hr$dht$individuals$N$ucl[3]/cf$simple)
-mclaren.N = c(est=bk.hr$dht$individuals$N$Estimate[3]/cf$mclaren,
-          lcl=bk.hr$dht$individuals$N$lcl[3]/cf$mclaren,
-          ucl=bk.hr$dht$individuals$N$ucl[3]/cf$mclaren)
-laake.N = c(est=bk.hr$dht$individuals$N$Estimate[3]/cf$laake,
-          lcl=bk.hr$dht$individuals$N$lcl[3]/cf$laake,
-          ucl=bk.hr$dht$individuals$N$ucl[3]/cf$laake)
+simple.N = cds.N/cf[,"simple"]
+mclaren.N = cds.N/cf[,"simple"]
+laake.N = cds.N/cf[,"simple"]
 Nests = t(data.frame(simple=round(simple.N),mclaren=round(mclaren.N),laake=round(laake.N)))
 Nests
 

@@ -1,0 +1,15 @@
+base
+methods
+datasets
+utils
+grDevices
+graphics
+stats
+Rcpp
+RcppArmadillo
+HiddenMarkov
+MASS
+goftest
+hmltm
+mrds
+Distance
